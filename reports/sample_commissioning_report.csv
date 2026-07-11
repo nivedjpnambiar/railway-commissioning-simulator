@@ -1,0 +1,9 @@
+Test ID,Requirement,Expected,Measured,Result,Notes
+TC-001,The subsystem shall initialize in a safe closed state.,State CLOSED and closed sensor active,State CLOSED; closed sensor=True,PASS,
+TC-002,The door shall reach the open end position within 5 s.,OPEN within 5 s,State OPEN after 3.5 s,PASS,
+TC-003,The door shall return to the closed end position.,CLOSED and closed sensor active,State CLOSED; position=0.0%,PASS,
+TC-004,Actuator current shall remain below 1.50 A in normal operation.,Peak < 1.50 A,Peak 0.65 A,PASS,
+TC-005,A communication loss shall be detected and trigger a safe fault state.,communication_ok=False and state FAULT,communication_ok=False; state=FAULT,PASS,
+TC-006,Motor overcurrent shall be diagnosed and motion shall stop.,D107 present and state FAULT,Codes ['D107']; state=FAULT,PASS,
+TC-007,Contradictory position signals shall be rejected as implausible.,"Both sensors active, D104 present, state FAULT",open=True; closed=True; codes=['D104'],PASS,
+TC-008,Operation shall be inhibited below 19 V.,Voltage < 19 V and state FAULT,Voltage 17.5 V; state=FAULT,PASS,

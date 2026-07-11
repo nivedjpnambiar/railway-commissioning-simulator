@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Virtual Commissioning Test Report</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 2rem; color: #1f2937; }
+h1, h2 { margin-bottom: 0.4rem; }
+.summary { padding: 1rem; border: 1px solid #d1d5db; margin: 1rem 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { border: 1px solid #d1d5db; padding: 0.5rem; text-align: left; vertical-align: top; }
+th { background: #f3f4f6; }
+</style>
+</head>
+<body>
+<h1>Virtual Railway Door Commissioning Report</h1>
+<p>Generated: 2026-07-11 09:44 UTC</p>
+<div class="summary">
+<strong>Project version:</strong> 1.0.0<br>
+<strong>Passed tests:</strong> 8/8<br>
+<strong>Overall result:</strong> PASS
+</div>
+<table>
+<thead><tr><th>Test ID</th><th>Requirement</th><th>Expected</th><th>Measured</th><th>Result</th><th>Notes</th></tr></thead>
+<tbody><tr><td>TC-001</td><td>The subsystem shall initialize in a safe closed state.</td><td>State CLOSED and closed sensor active</td><td>State CLOSED; closed sensor=True</td><td>PASS</td><td></td></tr><tr><td>TC-002</td><td>The door shall reach the open end position within 5 s.</td><td>OPEN within 5 s</td><td>State OPEN after 3.5 s</td><td>PASS</td><td></td></tr><tr><td>TC-003</td><td>The door shall return to the closed end position.</td><td>CLOSED and closed sensor active</td><td>State CLOSED; position=0.0%</td><td>PASS</td><td></td></tr><tr><td>TC-004</td><td>Actuator current shall remain below 1.50 A in normal operation.</td><td>Peak &lt; 1.50 A</td><td>Peak 0.65 A</td><td>PASS</td><td></td></tr><tr><td>TC-005</td><td>A communication loss shall be detected and trigger a safe fault state.</td><td>communication_ok=False and state FAULT</td><td>communication_ok=False; state=FAULT</td><td>PASS</td><td></td></tr><tr><td>TC-006</td><td>Motor overcurrent shall be diagnosed and motion shall stop.</td><td>D107 present and state FAULT</td><td>Codes [&#x27;D107&#x27;]; state=FAULT</td><td>PASS</td><td></td></tr><tr><td>TC-007</td><td>Contradictory position signals shall be rejected as implausible.</td><td>Both sensors active, D104 present, state FAULT</td><td>open=True; closed=True; codes=[&#x27;D104&#x27;]</td><td>PASS</td><td></td></tr><tr><td>TC-008</td><td>Operation shall be inhibited below 19 V.</td><td>Voltage &lt; 19 V and state FAULT</td><td>Voltage 17.5 V; state=FAULT</td><td>PASS</td><td></td></tr></tbody>
+</table>
+</body>
+</html>
