@@ -98,12 +98,10 @@ railway-commissioning-simulator/
 └── pyproject.toml
 ```
 
-## CV wording after you understand and can demonstrate the project
+## Summary
 
 - Developed a Python-based virtual commissioning environment for a simulated railway passenger-door subsystem.
 - Implemented state-machine control, CAN-style interface modelling, fault injection and diagnostic trouble codes.
 - Automated requirement-oriented acceptance tests and generated traceable HTML/CSV test reports.
 
-## Honest scope statement
 
-Use the terms **virtual CAN-style communication** or **CAN message modelling** unless you later connect real CAN hardware. Do not claim practical CAN-bus commissioning from this software-only version.
