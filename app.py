@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from railway_commissioning.commissioning import run_commissioning_suite
+from railway_commissioning.detection import detect_faults
 from railway_commissioning.diagnostics import diagnose
 from railway_commissioning.models import DoorCommand, FaultMode
 from railway_commissioning.reporting import results_to_csv, results_to_html
@@ -81,12 +82,13 @@ with st.sidebar:
 
 latest = simulator.latest()
 
-metric_columns = st.columns(5)
+metric_columns = st.columns(6)
 metric_columns[0].metric("State", latest.state.value)
 metric_columns[1].metric("Position", f"{latest.position_pct:.1f}%")
 metric_columns[2].metric("Motor current", f"{latest.motor_current_a:.2f} A")
 metric_columns[3].metric("Supply", f"{latest.supply_voltage_v:.1f} V")
 metric_columns[4].metric("Communication", "OK" if latest.communication_ok else "LOST")
+metric_columns[5].metric("Closed & locked", "YES" if latest.closed_and_locked else "NO")
 
 left, right = st.columns([1.4, 1])
 with left:
@@ -107,12 +109,21 @@ with right:
             "Active injected faults": [fault.value for fault in latest.active_faults] or ["none"],
         }
     )
+    st.markdown("**Measurement-based detection** (uses only recorded values)")
+    detections = detect_faults(simulator.history, simulator.protection_log, simulator.config)
+    if not detections:
+        st.success("No findings in the recorded measurements")
+    for det in detections:
+        st.error(f"{det.code} at {det.first_seen_s:.1f} s: {det.evidence}")
+    for trip in simulator.protection_log:
+        st.warning(f"Protection trip at {trip.timestamp_s:.1f} s: {trip.reason} (measured {trip.measured:g}, limit {trip.limit:g} {trip.unit})")
+
+    st.markdown("**Fault catalogue entry for injected faults**")
     events = diagnose(latest)
     if not events:
-        st.success("No active diagnostic events")
+        st.caption("No injected faults")
     for event in events:
-        st.error(f"{event.code} — {event.title}")
-        st.write(event.details)
+        st.write(f"{event.code} — {event.title}")
         st.caption(f"Recommended action: {event.recommendation}")
 
 st.subheader("Virtual CAN-style message log")

@@ -17,7 +17,7 @@ def results_to_csv(results: list[TestResult]) -> str:
     return buffer.getvalue()
 
 
-def results_to_html(results: list[TestResult], project_version: str = "1.0.0") -> str:
+def results_to_html(results: list[TestResult], project_version: str = "1.1.0") -> str:
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     passed = sum(result.passed for result in results)
     overall = "PASS" if passed == len(results) else "FAIL"

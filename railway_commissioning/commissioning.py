@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .detection import detect_faults
 from .diagnostics import diagnose
 from .models import DoorCommand, DoorState, FaultMode, TestResult
 from .simulator import DoorSystemSimulator
@@ -128,6 +129,51 @@ def run_commissioning_suite() -> list[TestResult]:
             "Voltage < 19 V and state FAULT",
             f"Voltage {t.supply_voltage_v:.1f} V; state={t.state.value}",
             t.supply_voltage_v < 19.0 and t.state is DoorState.FAULT,
+        )
+    )
+
+    blocked = DoorSystemSimulator()
+    blocked.inject_fault(FaultMode.BLOCKED_DOOR)
+    blocked.issue_command(DoorCommand.OPEN)
+    blocked.run_for(2.0)
+    t = blocked.latest()
+    stall = next((trip for trip in blocked.protection_log if trip.reason == "motor_stall"), None)
+    results.append(
+        TestResult(
+            "TC-009",
+            "A blocked door shall be de-energised within 1.5 s (stall protection).",
+            "motor_stall trip <= 1.5 s, state FAULT, current 0 A",
+            f"trip at {stall.timestamp_s if stall else '-'} s; state={t.state.value}; current={t.motor_current_a:.2f} A",
+            stall is not None and stall.timestamp_s <= 1.5 and t.state is DoorState.FAULT and t.motor_current_a == 0.0,
+        )
+    )
+
+    no_closed = DoorSystemSimulator()
+    no_closed.inject_fault(FaultMode.CLOSED_SENSOR_FAILED)
+    no_closed.issue_command(DoorCommand.OPEN)
+    no_closed.run_for(3.5)
+    no_closed.issue_command(DoorCommand.CLOSE)
+    no_closed.run_for(3.5)
+    t = no_closed.latest()
+    results.append(
+        TestResult(
+            "TC-010",
+            "Departure shall not be permitted without a confirmed closed end position.",
+            "door_closed_and_locked=False while closed sensor failed",
+            f"state={t.state.value}; closed sensor={t.closed_sensor}; closed_and_locked={t.closed_and_locked}",
+            t.state is DoorState.CLOSED and not t.closed_and_locked,
+        )
+    )
+
+    healthy = _healthy_close_cycle()
+    findings = detect_faults(healthy.history, healthy.protection_log, healthy.config)
+    results.append(
+        TestResult(
+            "TC-011",
+            "A healthy open/close cycle shall produce no diagnostic findings and permit departure.",
+            "no findings, door_closed_and_locked=True",
+            f"findings={[d.code for d in findings] or 'none'}; closed_and_locked={healthy.latest().closed_and_locked}",
+            not findings and healthy.latest().closed_and_locked,
         )
     )
 
