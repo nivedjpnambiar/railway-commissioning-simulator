@@ -7,3 +7,6 @@ TC-005,A communication loss shall be detected and trigger a safe fault state.,co
 TC-006,Motor overcurrent shall be diagnosed and motion shall stop.,D107 present and state FAULT,Codes ['D107']; state=FAULT,PASS,
 TC-007,Contradictory position signals shall be rejected as implausible.,"Both sensors active, D104 present, state FAULT",open=True; closed=True; codes=['D104'],PASS,
 TC-008,Operation shall be inhibited below 19 V.,Voltage < 19 V and state FAULT,Voltage 17.5 V; state=FAULT,PASS,
+TC-009,A blocked door shall be de-energised within 1.5 s (stall protection).,"motor_stall trip <= 1.5 s, state FAULT, current 0 A",trip at 1.0 s; state=FAULT; current=0.00 A,PASS,
+TC-010,Departure shall not be permitted without a confirmed closed end position.,door_closed_and_locked=False while closed sensor failed,state=CLOSED; closed sensor=False; closed_and_locked=False,PASS,
+TC-011,A healthy open/close cycle shall produce no diagnostic findings and permit departure.,"no findings, door_closed_and_locked=True",findings=none; closed_and_locked=True,PASS,
