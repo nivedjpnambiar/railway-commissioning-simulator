@@ -52,6 +52,26 @@ class DiagnosticEvent:
 
 
 @dataclass(frozen=True)
+class ProtectionTrip:
+    """Record of a protection function that forced the safe state."""
+
+    timestamp_s: float
+    reason: str
+    measured: float
+    limit: float
+    unit: str
+
+
+@dataclass(frozen=True)
+class Detection:
+    """A fault code found by the measurement-based diagnosis."""
+
+    code: str
+    first_seen_s: float
+    evidence: str
+
+
+@dataclass(frozen=True)
 class Telemetry:
     timestamp_s: float
     state: DoorState
@@ -62,6 +82,7 @@ class Telemetry:
     open_sensor: bool
     closed_sensor: bool
     communication_ok: bool
+    closed_and_locked: bool
     active_faults: tuple[FaultMode, ...]
 
     def to_dict(self) -> dict[str, Any]:

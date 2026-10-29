@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .bus import VirtualCanBus
-from .models import DoorCommand, DoorState, FaultMode, Telemetry
+from .models import DoorCommand, DoorState, FaultMode, ProtectionTrip, Telemetry
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,7 @@ class SimulatorConfig:
     travel_time_s: float = 3.0
     sensor_tolerance_pct: float = 1.0
     movement_timeout_s: float = 5.0
+    stall_time_s: float = 1.0
 
 
 class DoorSystemSimulator:
@@ -33,9 +34,11 @@ class DoorSystemSimulator:
         self.supply_voltage_v = self.config.nominal_voltage_v
         self.motor_current_a = 0.0
         self.motion_elapsed_s = 0.0
+        self.stall_elapsed_s = 0.0
         if full or not hasattr(self, "faults"):
             self.faults: set[FaultMode] = set()
         self.history: list[Telemetry] = []
+        self.protection_log: list[ProtectionTrip] = []
         self.bus.clear()
         self.bus.online = FaultMode.COMMUNICATION_LOSS not in self.faults
         self._record_telemetry()
@@ -74,7 +77,8 @@ class DoorSystemSimulator:
             self.command = DoorCommand.NONE
             return
         if command is DoorCommand.STOP:
-            self.state = DoorState.STOPPED
+            if self.state is not DoorState.FAULT:  # STOP must not clear a latched fault
+                self.state = DoorState.STOPPED
             self.motor_current_a = 0.0
             return
         if command is DoorCommand.OPEN and self.state not in {DoorState.OPEN, DoorState.FAULT}:
@@ -115,6 +119,7 @@ class DoorSystemSimulator:
         moving = self.state in {DoorState.OPENING, DoorState.CLOSING}
         if not moving:
             self.motor_current_a = 0.0
+            self.stall_elapsed_s = 0.0
             return
 
         self.motion_elapsed_s += dt_s
@@ -122,6 +127,7 @@ class DoorSystemSimulator:
 
         if FaultMode.BLOCKED_DOOR in self.faults:
             self.motor_current_a = 1.25
+            self.stall_elapsed_s += dt_s
             return
         if FaultMode.MOTOR_OVERCURRENT in self.faults:
             self.motor_current_a = 2.10
@@ -130,6 +136,7 @@ class DoorSystemSimulator:
             self.motor_current_a = 0.95
             return
 
+        self.stall_elapsed_s = 0.0
         delta = 100.0 * dt_s / self.config.travel_time_s
         if self.state is DoorState.OPENING:
             self.position_pct = min(100.0, self.position_pct + delta)
@@ -147,20 +154,34 @@ class DoorSystemSimulator:
                 self.motion_elapsed_s = 0.0
 
     def _apply_protection_logic(self) -> None:
-        critical = {
-            FaultMode.CONTRADICTORY_SENSORS,
-            FaultMode.COMMUNICATION_LOSS,
-            FaultMode.UNDERVOLTAGE,
-            FaultMode.MOTOR_OVERCURRENT,
-        }
-        if self.faults.intersection(critical):
-            self.state = DoorState.FAULT
+        """Force the safe state when a *measured* value violates its limit.
+
+        The protection only uses values a real door controller can measure
+        (current, voltage, sensor inputs, bus status, movement time) and the
+        limits from :class:`SimulatorConfig`. It never looks at which fault was
+        injected, so the reaction is tested the same way it would be on a test
+        bench. Once tripped, the FAULT state is latched until RESET.
+        """
+        if self.state is DoorState.FAULT:
             self.motor_current_a = 0.0
             return
 
-        if self.motion_elapsed_s > self.config.movement_timeout_s:
-            self.state = DoorState.FAULT
-            self.motor_current_a = 0.0
+        cfg = self.config
+        open_sensor, closed_sensor = self._sensors()
+        checks = (
+            (self.motor_current_a > cfg.overcurrent_limit_a, "motor_overcurrent", self.motor_current_a, cfg.overcurrent_limit_a, "A"),
+            (self.supply_voltage_v < cfg.undervoltage_threshold_v, "undervoltage", self.supply_voltage_v, cfg.undervoltage_threshold_v, "V"),
+            (open_sensor and closed_sensor, "sensor_implausible", 1.0, 0.0, "-"),
+            (not self.bus.online, "communication_timeout", 0.0, 1.0, "-"),
+            (self.stall_elapsed_s >= cfg.stall_time_s - 1e-9, "motor_stall", self.stall_elapsed_s, cfg.stall_time_s, "s"),
+            (self.motion_elapsed_s > cfg.movement_timeout_s, "movement_timeout", self.motion_elapsed_s, cfg.movement_timeout_s, "s"),
+        )
+        for violated, reason, measured, limit, unit in checks:
+            if violated:
+                self.protection_log.append(ProtectionTrip(self.time_s, reason, round(measured, 3), limit, unit))
+                self.state = DoorState.FAULT
+                self.motor_current_a = 0.0
+                return
 
     def _sensors(self) -> tuple[bool, bool]:
         tol = self.config.sensor_tolerance_pct
@@ -195,6 +216,7 @@ class DoorSystemSimulator:
             open_sensor=open_sensor,
             closed_sensor=closed_sensor,
             communication_ok=self.bus.online,
+            closed_and_locked=self.state is DoorState.CLOSED and closed_sensor and not open_sensor,
             active_faults=tuple(sorted(self.faults, key=lambda fault: fault.value)),
         )
         self.history.append(telemetry)
@@ -206,6 +228,7 @@ class DoorSystemSimulator:
             (0x202, "position_pct", telemetry.position_pct),
             (0x203, "motor_current_a", telemetry.motor_current_a),
             (0x204, "supply_voltage_v", telemetry.supply_voltage_v),
+            (0x205, "door_closed_and_locked", telemetry.closed_and_locked),
         )
         for message_id, signal, value in payloads:
             self.bus.send(
